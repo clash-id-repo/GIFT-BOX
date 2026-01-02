@@ -1226,12 +1226,12 @@
 
             <!-- Voice Meter -->
             <div class="voice-meter-container" id="voiceMeterContainer">
-                <div class="voice-meter-label">Keep speaking... <span id="speakTimer">3</span>s</div>
+                <div class="voice-meter-label">Volume Level (Min: <span id="thresholdDisplay">30</span>%)</div>
                 <div class="voice-meter-bar">
                     <div class="voice-meter-fill" id="voiceMeterFill"></div>
-                    
+                    <div class="voice-meter-threshold-line"></div>
                 </div>
-                <div class="voice-meter-threshold">Speak continuously for 3 seconds</div>
+                <div class="voice-meter-threshold">Speak louder to activate</div>
             </div>
         </div>
     </div>
@@ -1271,7 +1271,7 @@
     <script>
         const CONFIG = {
             password: '2026',
-            voiceKeyword: 'aku sayang diriku',
+            voiceKeyword: 'open',
             requiredShakes: 25,
             shakeThreshold: 15,
             voiceThreshold: 80,
@@ -1328,58 +1328,67 @@
         
 
         
-        // ========== VOICE TIMER (Must speak for duration) ==========
+        // ========== VOICE DETECTION (Real Speech Events) ==========
         let voiceMeterInterval;
-        let speakingStartTime = null;
-        let minimumSpeakDuration = 3000; // 3 seconds
+        let isSpeaking = false;
+        let speakingTime = 0;
+        let minimumSpeakDuration = 20000; // 3 seconds
         let canProceed = false;
 
         function startSimpleVoiceMeter() {
             const container = document.getElementById('voiceMeterContainer');
-            const fill = document.getElementById('voiceMeterFill');
-            const label = document.querySelector('.voice-meter-label');
-
-            if (!container || !fill) return;
+            if (!container) return;
 
             container.classList.add('active');
-            speakingStartTime = Date.now();
+            isSpeaking = false;
+            speakingTime = 0;
             canProceed = false;
 
-            if (label) {
-                label.innerHTML = 'Keep speaking... <span id="speakTimer">3</span>s';
-            }
+            updateMeterDisplay();
 
-            let progress = 0;
-
-            // Progress bar bergerak berdasarkan waktu
             voiceMeterInterval = setInterval(() => {
-                const elapsed = Date.now() - speakingStartTime;
-                progress = Math.min(100, (elapsed / minimumSpeakDuration) * 100);
-
-                fill.style.width = progress + '%';
-
-                // Update timer display
-                const remaining = Math.max(0, Math.ceil((minimumSpeakDuration - elapsed) / 1000));
-                const timerDisplay = document.getElementById('speakTimer');
-                if (timerDisplay) {
-                    timerDisplay.textContent = remaining;
+                // Only increment if actually speaking
+                if (isSpeaking && speakingTime < minimumSpeakDuration) {
+                    speakingTime += 100;
                 }
-
-                // Change color based on progress
-                if (progress >= 100) {
-                    fill.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.8)';
-                    canProceed = true;
-                    if (label) {
-                        label.innerHTML = '✅ Ready! Say the keyword';
-                    }
-                } else if (progress > 60) {
-                    fill.style.boxShadow = '0 0 20px rgba(251, 191, 36, 0.8)';
-                } else {
-                    fill.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.6)';
-                }
+                updateMeterDisplay();
             }, 100);
 
-            console.log('Voice timer started - need to speak for', minimumSpeakDuration / 1000, 'seconds');
+            console.log('Voice detection started - need 3 seconds of actual speaking');
+        }
+
+        function updateMeterDisplay() {
+            const fill = document.getElementById('voiceMeterFill');
+            const label = document.querySelector('.voice-meter-label');
+            const timerDisplay = document.getElementById('speakTimer');
+
+            if (!fill) return;
+
+            const progress = Math.min(100, (speakingTime / minimumSpeakDuration) * 100);
+            fill.style.width = progress + '%';
+
+            const seconds = (speakingTime / 1000).toFixed(1);
+            if (timerDisplay) timerDisplay.textContent = seconds;
+
+            if (label) {
+                if (progress >= 100) {
+                    label.innerHTML = 'Ready! Now say the keyword';
+                    canProceed = true;
+                } else if (isSpeaking) {
+                    label.innerHTML = '🎤 Speaking... <span id="speakTimer">' + seconds + '</span>s / 20s';
+                } else {
+                    label.innerHTML = '🔇 Start speaking... <span id="speakTimer">' + seconds + '</span>s / 20s';
+                }
+            }
+
+            // Color based on progress
+            if (progress >= 100) {
+                fill.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.8)';
+            } else if (progress > 60) {
+                fill.style.boxShadow = '0 0 20px rgba(251, 191, 36, 0.8)';
+            } else {
+                fill.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.6)';
+            }
         }
 
         function stopSimpleVoiceMeter() {
@@ -1390,23 +1399,29 @@
 
             const container = document.getElementById('voiceMeterContainer');
             const fill = document.getElementById('voiceMeterFill');
-            const label = document.querySelector('.voice-meter-label');
 
             if (container) container.classList.remove('active');
             if (fill) fill.style.width = '0%';
-            if (label) label.innerHTML = 'Volume Level (Min: <span id="thresholdDisplay">30</span>%)';
 
-            speakingStartTime = null;
+            isSpeaking = false;
+            speakingTime = 0;
             canProceed = false;
+        }
 
-            console.log('Voice timer stopped');
+        function onSpeechStart() {
+            console.log('🎤 Speech detected! Timer counting...');
+            isSpeaking = true;
+        }
+
+        function onSpeechEnd() {
+            console.log('🔇 Speech stopped. Timer paused.');
+            isSpeaking = false;
         }
 
         function checkCanProceed() {
             return canProceed;
         }
 
-        // Update threshold display
         document.addEventListener('DOMContentLoaded', () => {
             const thresholdDisplay = document.getElementById('thresholdDisplay');
             const thresholdLine = document.querySelector('.voice-meter-threshold-line');
@@ -1431,7 +1446,19 @@
             
             recognition.onstart = () => {
                 micButton.classList.add('listening');
-                showToast('Listening...', 'success');
+                showToast('Listening... Start speaking!', 'success');
+            };
+
+            // Detect when user starts speaking
+            recognition.onspeechstart = () => {
+                console.log('Speech recognition: speech started');
+                onSpeechStart();
+            };
+
+            // Detect when user stops speaking
+            recognition.onspeechend = () => {
+                console.log('Speech recognition: speech ended');
+                onSpeechEnd();
             };
             
             recognition.onresult = (event) => {
@@ -1440,7 +1467,7 @@
                 if (transcript.includes(CONFIG.voiceKeyword.toLowerCase())) {
                     handleVoiceSuccess();
                 } else {
-                    showToast(`❓ You said: "${transcript}"`, 'error');
+                    showToast(`🤔 You said: "${transcript}"`, 'error');
                     setTimeout(() => {
                         if (currentStep === 3 && !voiceSuccess) startVoiceRecognition();
                     }, 2000);
