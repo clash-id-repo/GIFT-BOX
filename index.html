@@ -1338,7 +1338,7 @@
 
             <!-- Counter & Progress Bar - TENGAH VIEWPORT -->
             <div class="shake-counter-overlay" id="shakeCounterOverlay">
-                <div class="shake-counter-display"><span id="shakeCount">0</span> / 25</div>
+                <div class="shake-counter-display"><span id="shakeCount">0</span> / 15</div>
                 <div class="shake-progress-bar">
                     <div class="shake-progress-fill" id="shakeProgress"></div>
                 </div>
@@ -1466,7 +1466,7 @@
         const CONFIG = {
             password: '2026',
             voiceKeyword: 'aku gendut dan aku bangga',
-            requiredShakes: 25,
+            requiredShakes: 15,
             shakeThreshold: 15
         };
 
@@ -1475,7 +1475,6 @@
 
         function enterFullscreen() {
             const elem = document.documentElement;
-
             if (elem.requestFullscreen) {
                 elem.requestFullscreen();
             } else if (elem.webkitRequestFullscreen) {
@@ -1620,11 +1619,11 @@
         let voiceMeterInterval;
         let isSpeaking = false;
         let speakingTime = 0;
-        let minimumSpeakDuration = 20000;
+        let minimumSpeakDuration = 2000;
         let canProceed = false;
         let phase = 1;
         let keywordCount = 0;
-        let requiredKeywordCount = 3;
+        let requiredKeywordCount = 1;
 
         function startSimpleVoiceMeter() {
             console.log('🎙 Voice meter - Phase:', phase);
@@ -1925,12 +1924,28 @@
             // Music system
             lastShakeTime = Date.now();
 
-            if (shakeCount === 7) {
+            if (shakeCount === 1) {
                 startMusic();
             }
 
             if (musicStarted) {
                 resumeMusic();
+            }
+
+            // CLIMAX at shake 14-15 (music detik 14-15)
+            if (shakeCount === 14 || shakeCount === 15) {
+                // Visual pulse for climax
+                document.body.style.animation = 'none';
+                setTimeout(() => {
+                    document.body.style.animation = '';
+                }, 50);
+
+                // Extra strong vibration
+                if ('vibrate' in navigator) {
+                    navigator.vibrate([150, 75, 150, 75, 150]);
+                }
+
+                console.log('🎵 CLIMAX! Shake', shakeCount, '- Music peak!');
             }
             document.getElementById('shakeCount').textContent = shakeCount;
             
@@ -1954,22 +1969,6 @@
             setTimeout(() => motionEnabled = true, 300);
         }
 
-            // Music climax at shake 21-22 (detik 14-15)
-            if (shakeCount === 21 || shakeCount === 22) {
-                // Visual pulse for climax
-                document.body.style.animation = 'none';
-                setTimeout(() => {
-                    document.body.style.animation = '';
-                }, 50);
-
-                // Extra vibration for climax moment
-                if ('vibrate' in navigator) {
-                    navigator.vibrate([100, 50, 100, 50, 100]);
-                }
-
-                console.log('🎵 CLIMAX! Shake', shakeCount);
-            }
-
         function shakeComplete() {
             window.removeEventListener('devicemotion', handleMotion);
             // NO TOAST "Perfect"
@@ -1984,8 +1983,7 @@
             revealContainer.classList.add('zoom-in');
             
             const audio = document.getElementById('celebrationAudio');
-            audio.volume = 0.3;
-            audio.play().catch(e => console.log('Audio blocked'));
+            // Music already playing, don't restart - let it continue through reveal
             
             // INSTANT MASSIVE CELEBRATION
             setTimeout(() => createMassiveConfetti(), 200);
