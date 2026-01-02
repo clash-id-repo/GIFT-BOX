@@ -701,8 +701,8 @@
         }
 
         .mic-button {
-            width: 80px;
-            height: 80px;
+            width: 100px;
+            height: 100px;
             border-radius: 50%;
             background: rgba(255,255,255,0.08);
             border: 2px solid rgba(255,255,255,0.2);
@@ -817,6 +817,83 @@
         }
 
         .gift-container.box-opened .voice-meter-container {
+            display: none;
+        }
+
+        
+        /* ========== KEYWORD DISPLAY (PHASE 2) ========== */
+        .keyword-display {
+            position: fixed;
+            top: 60%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.5s;
+            z-index: 110;
+            background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(30,30,30,0.95));
+            padding: 35px 55px;
+            border-radius: 30px;
+            border: 3px solid rgba(251, 191, 36, 0.4);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            min-width: 350px;
+            backdrop-filter: blur(15px);
+        }
+
+        .keyword-display.active {
+            opacity: 1;
+            animation: keyword-pulse 2s ease-in-out infinite;
+        }
+
+        .keyword-label {
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 18px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+        }
+
+        .keyword-text {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #fbbf24;
+            margin: 20px 0;
+            text-shadow: 0 0 30px rgba(251, 191, 36, 0.8),
+                         0 0 60px rgba(251, 191, 36, 0.4);
+            letter-spacing: 4px;
+            animation: text-glow 1.5s ease-in-out infinite alternate;
+        }
+
+        .keyword-counter {
+            font-size: 1.5rem;
+            color: #10b981;
+            margin-top: 18px;
+            font-weight: 700;
+            padding: 12px 25px;
+            background: rgba(16, 185, 129, 0.15);
+            border-radius: 20px;
+            border: 2px solid rgba(16, 185, 129, 0.4);
+            display: inline-block;
+        }
+
+        @keyframes keyword-pulse {
+            0%, 100% {
+                box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 40px rgba(251, 191, 36, 0.3);
+                border-color: rgba(251, 191, 36, 0.3);
+            }
+            50% {
+                box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 80px rgba(251, 191, 36, 0.6);
+                border-color: rgba(251, 191, 36, 0.7);
+            }
+        }
+
+        @keyframes text-glow {
+            from { text-shadow: 0 0 20px rgba(251, 191, 36, 0.5), 0 0 40px rgba(251, 191, 36, 0.3); }
+            to { text-shadow: 0 0 50px rgba(251, 191, 36, 1), 0 0 100px rgba(251, 191, 36, 0.6); }
+        }
+
+        .gift-container.box-opened .keyword-display {
             display: none;
         }
 
@@ -1130,7 +1207,7 @@
                     type="text" 
                     class="password-input" 
                     id="passwordInput" 
-                    placeholder="x x x x x x"
+                    placeholder="x x x x x x x"
                     autocomplete="off"
                 >
             </div>
@@ -1221,8 +1298,15 @@
                 </div>
             </div>
 
-            <button class="mic-button" id="micButton">🎤</button>
+            <button class="mic-button" id="micButton">🎙</button>
             <p class="mic-hint">Tap and speak something meaningful</p>
+
+            <!-- Keyword Display for Phase 2 -->
+            <div class="keyword-display" id="keywordDisplay">
+                <div class="keyword-label">SAY THIS WORD 3 TIMES:</div>
+                <div class="keyword-text" id="keywordText">SAYANG</div>
+                <div class="keyword-counter" id="keywordCounter">0 / 3</div>
+            </div>
 
             <!-- Voice Meter -->
             <div class="voice-meter-container" id="voiceMeterContainer">
@@ -1249,7 +1333,7 @@
                 <div class="photo-glow"></div>
                 
                 <div class="photo-wrapper">
-                    <img src="https://images.unsplash.com/photo-1464207687429-7505649dae38?w=800" alt="Gift">
+                    <img src="https://i.ibb.co.com/0yM4nt0r/Untitled-design-20260102-165624-0000.png" alt="Gift">
                 </div>
             </div>
 
@@ -1271,8 +1355,8 @@
     <script>
         const CONFIG = {
             password: '2026',
-            voiceKeyword: 'aku sayang diriku karena aku pantas dan berharga',
-            requiredShakes: 25,
+            voiceKeyword: 'aku gendut dan aku bangga',
+            requiredShakes: 44,
             shakeThreshold: 15
         };
 
@@ -1327,48 +1411,38 @@
 
         
         
-        // ========== 2-PHASE VOICE DETECTION SYSTEM ==========
-        // Phase 1: 20 seconds warm up (any words)
-        // Phase 2: Say keyword 3 times
-
+        // ========== 2-PHASE VOICE SYSTEM WITH ICONS ==========
         let voiceMeterInterval;
         let isSpeaking = false;
         let speakingTime = 0;
-        let minimumSpeakDuration = 20000; // 20 seconds
+        let minimumSpeakDuration = 20000;
         let canProceed = false;
         let phase = 1;
         let keywordCount = 0;
         let requiredKeywordCount = 3;
 
         function startSimpleVoiceMeter() {
-            console.log('🎤 Starting voice meter - Phase:', phase);
-
+            console.log('🎙 Voice meter - Phase:', phase);
             const container = document.getElementById('voiceMeterContainer');
             if (!container) return;
 
-            // Phase 2: No meter needed
             if (phase === 2) {
                 container.classList.remove('active');
                 return;
             }
 
-            // Phase 1: Show meter
             container.classList.add('active');
             isSpeaking = false;
             speakingTime = 0;
             canProceed = false;
-
             updateMeterDisplay();
 
             voiceMeterInterval = setInterval(() => {
-                // Only count when speaking
                 if (isSpeaking && speakingTime < minimumSpeakDuration) {
                     speakingTime += 100;
                 }
                 updateMeterDisplay();
             }, 100);
-
-            console.log('Voice meter started for Phase 1');
         }
 
         function updateMeterDisplay() {
@@ -1386,16 +1460,15 @@
 
             if (label) {
                 if (progress >= 100) {
-                    label.innerHTML = 'Phase 1 Complete! Get ready...';
+                    label.innerHTML = '✓ Phase 1 Complete!';
                     canProceed = true;
                 } else if (isSpeaking) {
-                    label.innerHTML = '🎤 Speaking... <span id="speakTimer">' + seconds + '</span>s / 20s';
+                    label.innerHTML = '▶ Speaking... <span id="speakTimer">' + seconds + '</span>s / 20s';
                 } else {
-                    label.innerHTML = '🔇 Start speaking... <span id="speakTimer">' + seconds + '</span>s / 20s';
+                    label.innerHTML = '⏸ Start speaking... <span id="speakTimer">' + seconds + '</span>s / 20s';
                 }
             }
 
-            // Color progression
             if (progress >= 100) {
                 fill.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.8)';
             } else if (progress > 60) {
@@ -1410,23 +1483,42 @@
                 clearInterval(voiceMeterInterval);
                 voiceMeterInterval = null;
             }
-
             const container = document.getElementById('voiceMeterContainer');
             const fill = document.getElementById('voiceMeterFill');
-
             if (container) container.classList.remove('active');
             if (fill) fill.style.width = '0%';
+        }
 
-            console.log('Voice meter stopped');
+        function showKeywordDisplay() {
+            const keywordDisplay = document.getElementById('keywordDisplay');
+            const keywordText = document.getElementById('keywordText');
+            const keywordCounter = document.getElementById('keywordCounter');
+
+            if (keywordDisplay) keywordDisplay.classList.add('active');
+            if (keywordText) keywordText.textContent = CONFIG.voiceKeyword.toUpperCase();
+            if (keywordCounter) keywordCounter.textContent = '0 / 3';
+            console.log('📄 Keyword display shown');
+        }
+
+        function updateKeywordCounter() {
+            const keywordCounter = document.getElementById('keywordCounter');
+            if (keywordCounter) {
+                keywordCounter.textContent = keywordCount + ' / ' + requiredKeywordCount;
+            }
+        }
+
+        function hideKeywordDisplay() {
+            const keywordDisplay = document.getElementById('keywordDisplay');
+            if (keywordDisplay) keywordDisplay.classList.remove('active');
         }
 
         function onSpeechStart() {
-            console.log('🎤 Speech detected - timer running');
+            console.log('▶ Speech started');
             isSpeaking = true;
         }
 
         function onSpeechEnd() {
-            console.log('🔇 Speech stopped - timer paused');
+            console.log('⏸ Speech ended');
             isSpeaking = false;
         }
 
@@ -1441,7 +1533,7 @@
             canProceed = false;
             isSpeaking = false;
             stopSimpleVoiceMeter();
-            console.log('Voice system reset');
+            hideKeywordDisplay();
         }
 
         micButton.addEventListener('click', startVoiceRecognition);
@@ -1462,52 +1554,44 @@
             recognition.onstart = () => {
                 micButton.classList.add('listening');
                 if (phase === 1) {
-                    showToast('🎤 Phase 1: Speak for 20 seconds', 'success');
+                    showToast('🎙 Phase 1: Speak for 20 seconds', 'success');
                 } else {
-                    showToast('🎯 Phase 2: Say "' + CONFIG.voiceKeyword + '" 3 times', 'success');
+                    showToast('🎯 Phase 2: Say the keyword below!', 'success');
                 }
             };
 
             recognition.onspeechstart = () => {
-                console.log('Recognition: Speech started');
                 onSpeechStart();
             };
 
             recognition.onspeechend = () => {
-                console.log('Recognition: Speech ended');
                 onSpeechEnd();
             };
             
             recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript.toLowerCase();
-                console.log('📝 Result:', transcript, '| Phase:', phase, '| Time:', (speakingTime/1000).toFixed(1) + 's');
+                console.log('📄', transcript, '| Phase:', phase);
 
                 if (phase === 1) {
-                    // ===== PHASE 1: WARM UP =====
-                    console.log('Phase 1: Warm up - keyword ignored');
-
+                    // PHASE 1
                     if (checkCanProceed()) {
-                        // 20 seconds complete!
-                        console.log('Phase 1 COMPLETE! Moving to Phase 2');
-                        showToast('Perfect! Now say "' + CONFIG.voiceKeyword + '" 3 times', 'success');
+                        console.log('✓ Phase 1 COMPLETE');
+                        showToast('✓ Perfect! Look below the mic!', 'success');
                         playHaptic(2);
 
                         phase = 2;
                         keywordCount = 0;
                         stopSimpleVoiceMeter();
+                        showKeywordDisplay();
 
                         setTimeout(() => {
                             if (currentStep === 3 && !voiceSuccess) {
-                                console.log('Starting Phase 2...');
                                 startVoiceRecognition();
                             }
                         }, 2000);
                     } else {
-                        // Continue Phase 1
                         const remaining = Math.ceil((minimumSpeakDuration - speakingTime) / 1000);
-                        console.log('Phase 1: Continue...', remaining, 's remaining');
-                        showToast('Keep talking... (' + remaining + 's left)', 'info');
-
+                        showToast('Keep talking (' + remaining + 's left)', 'info');
                         setTimeout(() => {
                             if (currentStep === 3 && !voiceSuccess && phase === 1) {
                                 startVoiceRecognition();
@@ -1516,21 +1600,20 @@
                     }
 
                 } else if (phase === 2) {
-                    // ===== PHASE 2: KEYWORD DETECTION =====
-                    console.log('Phase 2: Keyword check');
-
+                    // PHASE 2
                     if (transcript.includes(CONFIG.voiceKeyword.toLowerCase())) {
                         keywordCount++;
-                        console.log('Keyword! (' + keywordCount + '/' + requiredKeywordCount + ')');
+                        console.log('✓ Keyword (' + keywordCount + '/3)');
                         playHaptic(1);
+                        updateKeywordCounter();
 
                         if (keywordCount >= requiredKeywordCount) {
-                            // SUCCESS!
-                            console.log('🎉 SUCCESS! All 3 keywords!');
-                            showToast('🎉 Amazing! Opening box...', 'success');
+                            console.log('★ SUCCESS!');
+                            showToast('★ Amazing! Opening box...', 'success');
+                            hideKeywordDisplay();
                             handleVoiceSuccess();
                         } else {
-                            showToast('Good! Say "' + CONFIG.voiceKeyword + '" again (' + keywordCount + '/3)', 'success');
+                            showToast('✓ Good! ' + keywordCount + '/3 - Say it again!', 'success');
                             setTimeout(() => {
                                 if (currentStep === 3 && !voiceSuccess && phase === 2) {
                                     startVoiceRecognition();
@@ -1538,9 +1621,8 @@
                             }, 1500);
                         }
                     } else {
-                        // Wrong word
-                        console.log('❌ Wrong:', transcript);
-                        showToast('❌ Say "' + CONFIG.voiceKeyword + '" not "' + transcript + '" (' + keywordCount + '/3)', 'error');
+                        console.log('✗ Wrong:', transcript);
+                        showToast('✗ Wrong! Say "' + CONFIG.voiceKeyword + '"', 'error');
                         setTimeout(() => {
                             if (currentStep === 3 && !voiceSuccess && phase === 2) {
                                 startVoiceRecognition();
@@ -1722,7 +1804,7 @@
         }
 
         function createFloatingEmojis() {
-            const emojis = ['❤️', '😍', '🥰', '😊', '💖', '💝', '💕', '🎉', '✨', '🌟'];
+            const emojis = ['❤️', '😍', '🥰', '😊', '💖', '💝', '💕', '★', '✨', '🌟'];
             
             for (let i = 0; i < 40; i++) {
                 setTimeout(() => {
