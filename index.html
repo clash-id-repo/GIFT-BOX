@@ -701,8 +701,8 @@
         }
 
         .mic-button {
-            width: 100px;
-            height: 100px;
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
             background: rgba(255,255,255,0.08);
             border: 2px solid rgba(255,255,255,0.2);
@@ -1130,7 +1130,7 @@
                     type="text" 
                     class="password-input" 
                     id="passwordInput" 
-                    placeholder="• • • • • •"
+                    placeholder="x x x x x x"
                     autocomplete="off"
                 >
             </div>
@@ -1271,11 +1271,9 @@
     <script>
         const CONFIG = {
             password: '2026',
-            voiceKeyword: 'open',
+            voiceKeyword: 'aku sayang diriku karena aku pantas dan berharga',
             requiredShakes: 25,
-            shakeThreshold: 15,
-            voiceThreshold: 80,
-            lowVolumeWarningTime: 1000
+            shakeThreshold: 15
         };
 
         let currentStep = 1;
@@ -1328,17 +1326,33 @@
         
 
         
-        // ========== VOICE DETECTION (Real Speech Events) ==========
+        
+        // ========== 2-PHASE VOICE DETECTION SYSTEM ==========
+        // Phase 1: 20 seconds warm up (any words)
+        // Phase 2: Say keyword 3 times
+
         let voiceMeterInterval;
         let isSpeaking = false;
         let speakingTime = 0;
-        let minimumSpeakDuration = 20000; // 3 seconds
+        let minimumSpeakDuration = 20000; // 20 seconds
         let canProceed = false;
+        let phase = 1;
+        let keywordCount = 0;
+        let requiredKeywordCount = 3;
 
         function startSimpleVoiceMeter() {
+            console.log('🎤 Starting voice meter - Phase:', phase);
+
             const container = document.getElementById('voiceMeterContainer');
             if (!container) return;
 
+            // Phase 2: No meter needed
+            if (phase === 2) {
+                container.classList.remove('active');
+                return;
+            }
+
+            // Phase 1: Show meter
             container.classList.add('active');
             isSpeaking = false;
             speakingTime = 0;
@@ -1347,14 +1361,14 @@
             updateMeterDisplay();
 
             voiceMeterInterval = setInterval(() => {
-                // Only increment if actually speaking
+                // Only count when speaking
                 if (isSpeaking && speakingTime < minimumSpeakDuration) {
                     speakingTime += 100;
                 }
                 updateMeterDisplay();
             }, 100);
 
-            console.log('Voice detection started - need 3 seconds of actual speaking');
+            console.log('Voice meter started for Phase 1');
         }
 
         function updateMeterDisplay() {
@@ -1372,7 +1386,7 @@
 
             if (label) {
                 if (progress >= 100) {
-                    label.innerHTML = 'Ready! Now say the keyword';
+                    label.innerHTML = 'Phase 1 Complete! Get ready...';
                     canProceed = true;
                 } else if (isSpeaking) {
                     label.innerHTML = '🎤 Speaking... <span id="speakTimer">' + seconds + '</span>s / 20s';
@@ -1381,7 +1395,7 @@
                 }
             }
 
-            // Color based on progress
+            // Color progression
             if (progress >= 100) {
                 fill.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.8)';
             } else if (progress > 60) {
@@ -1403,18 +1417,16 @@
             if (container) container.classList.remove('active');
             if (fill) fill.style.width = '0%';
 
-            isSpeaking = false;
-            speakingTime = 0;
-            canProceed = false;
+            console.log('Voice meter stopped');
         }
 
         function onSpeechStart() {
-            console.log('🎤 Speech detected! Timer counting...');
+            console.log('🎤 Speech detected - timer running');
             isSpeaking = true;
         }
 
         function onSpeechEnd() {
-            console.log('🔇 Speech stopped. Timer paused.');
+            console.log('🔇 Speech stopped - timer paused');
             isSpeaking = false;
         }
 
@@ -1422,12 +1434,15 @@
             return canProceed;
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const thresholdDisplay = document.getElementById('thresholdDisplay');
-            const thresholdLine = document.querySelector('.voice-meter-threshold-line');
-            if (thresholdDisplay) thresholdDisplay.textContent = CONFIG.voiceThreshold;
-            if (thresholdLine) thresholdLine.style.left = CONFIG.voiceThreshold + '%';
-        });
+        function resetVoiceSystem() {
+            phase = 1;
+            keywordCount = 0;
+            speakingTime = 0;
+            canProceed = false;
+            isSpeaking = false;
+            stopSimpleVoiceMeter();
+            console.log('Voice system reset');
+        }
 
         micButton.addEventListener('click', startVoiceRecognition);
 
@@ -1446,31 +1461,92 @@
             
             recognition.onstart = () => {
                 micButton.classList.add('listening');
-                showToast('Listening... Start speaking!', 'success');
+                if (phase === 1) {
+                    showToast('🎤 Phase 1: Speak for 20 seconds', 'success');
+                } else {
+                    showToast('🎯 Phase 2: Say "' + CONFIG.voiceKeyword + '" 3 times', 'success');
+                }
             };
 
-            // Detect when user starts speaking
             recognition.onspeechstart = () => {
-                console.log('Speech recognition: speech started');
+                console.log('Recognition: Speech started');
                 onSpeechStart();
             };
 
-            // Detect when user stops speaking
             recognition.onspeechend = () => {
-                console.log('Speech recognition: speech ended');
+                console.log('Recognition: Speech ended');
                 onSpeechEnd();
             };
             
             recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript.toLowerCase();
-                
-                if (transcript.includes(CONFIG.voiceKeyword.toLowerCase())) {
-                    handleVoiceSuccess();
-                } else {
-                    showToast(`🤔 You said: "${transcript}"`, 'error');
-                    setTimeout(() => {
-                        if (currentStep === 3 && !voiceSuccess) startVoiceRecognition();
-                    }, 2000);
+                console.log('📝 Result:', transcript, '| Phase:', phase, '| Time:', (speakingTime/1000).toFixed(1) + 's');
+
+                if (phase === 1) {
+                    // ===== PHASE 1: WARM UP =====
+                    console.log('Phase 1: Warm up - keyword ignored');
+
+                    if (checkCanProceed()) {
+                        // 20 seconds complete!
+                        console.log('Phase 1 COMPLETE! Moving to Phase 2');
+                        showToast('Perfect! Now say "' + CONFIG.voiceKeyword + '" 3 times', 'success');
+                        playHaptic(2);
+
+                        phase = 2;
+                        keywordCount = 0;
+                        stopSimpleVoiceMeter();
+
+                        setTimeout(() => {
+                            if (currentStep === 3 && !voiceSuccess) {
+                                console.log('Starting Phase 2...');
+                                startVoiceRecognition();
+                            }
+                        }, 2000);
+                    } else {
+                        // Continue Phase 1
+                        const remaining = Math.ceil((minimumSpeakDuration - speakingTime) / 1000);
+                        console.log('Phase 1: Continue...', remaining, 's remaining');
+                        showToast('Keep talking... (' + remaining + 's left)', 'info');
+
+                        setTimeout(() => {
+                            if (currentStep === 3 && !voiceSuccess && phase === 1) {
+                                startVoiceRecognition();
+                            }
+                        }, 1000);
+                    }
+
+                } else if (phase === 2) {
+                    // ===== PHASE 2: KEYWORD DETECTION =====
+                    console.log('Phase 2: Keyword check');
+
+                    if (transcript.includes(CONFIG.voiceKeyword.toLowerCase())) {
+                        keywordCount++;
+                        console.log('Keyword! (' + keywordCount + '/' + requiredKeywordCount + ')');
+                        playHaptic(1);
+
+                        if (keywordCount >= requiredKeywordCount) {
+                            // SUCCESS!
+                            console.log('🎉 SUCCESS! All 3 keywords!');
+                            showToast('🎉 Amazing! Opening box...', 'success');
+                            handleVoiceSuccess();
+                        } else {
+                            showToast('Good! Say "' + CONFIG.voiceKeyword + '" again (' + keywordCount + '/3)', 'success');
+                            setTimeout(() => {
+                                if (currentStep === 3 && !voiceSuccess && phase === 2) {
+                                    startVoiceRecognition();
+                                }
+                            }, 1500);
+                        }
+                    } else {
+                        // Wrong word
+                        console.log('❌ Wrong:', transcript);
+                        showToast('❌ Say "' + CONFIG.voiceKeyword + '" not "' + transcript + '" (' + keywordCount + '/3)', 'error');
+                        setTimeout(() => {
+                            if (currentStep === 3 && !voiceSuccess && phase === 2) {
+                                startVoiceRecognition();
+                            }
+                        }, 1500);
+                    }
                 }
             };
             
