@@ -1410,7 +1410,7 @@
     <div class="toast" id="toast"></div>
 
     <audio id="celebrationAudio" preload="auto">
-        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+        <source src="https://www.myinstants.com/media/sounds/outro-song-xenogenesis.mp3" type="audio/mpeg">
     </audio>
 
     <script>
@@ -1421,12 +1421,60 @@
             shakeThreshold: 15
         };
 
+        // ========== SMART MUSIC SYSTEM ==========
+        let musicAudio = null;
+        let musicStarted = false;
+        let lastShakeTime = Date.now();
+        let musicPauseTimeout = null;
+
+        function initMusic() {
+            musicAudio = document.getElementById('celebrationAudio');
+            if (musicAudio) {
+                musicAudio.volume = 0.7;
+                console.log('🎵 Music ready');
+            }
+        }
+
+        function startMusic() {
+            if (!musicAudio || musicStarted) return;
+
+            musicAudio.play().then(() => {
+                musicStarted = true;
+                console.log('🎵 Music started at shake', shakeCount);
+            }).catch(e => console.log('Music blocked:', e));
+        }
+
+        function checkMusicPause() {
+            if (!musicStarted || !musicAudio) return;
+
+            const timeSinceShake = Date.now() - lastShakeTime;
+
+            if (timeSinceShake > 3000 && !musicAudio.paused) {
+                musicAudio.pause();
+                console.log('⏸️ Music paused');
+            }
+        }
+
+        function resumeMusic() {
+            if (musicStarted && musicAudio && musicAudio.paused) {
+                musicAudio.play().then(() => {
+                    console.log('▶️ Music resumed');
+                }).catch(e => console.log('Resume failed:', e));
+            }
+        }
+
+        // Check music pause every second
+        setInterval(checkMusicPause, 1000);
+
+
+
         let currentStep = 1;
         let shakeCount = 0;
         let motionEnabled = false;
         let lastAcceleration = { x: 0, y: 0, z: 0 };
         let voiceSuccess = false;
 
+                initMusic();
         setTimeout(() => {
             switchScreen('passwordScreen');
             currentStep = 2;
@@ -1615,9 +1663,9 @@
             recognition.onstart = () => {
                 micButton.classList.add('listening');
                 if (phase === 1) {
-                    showToast('🎙 Phase 1: Speak for 20 seconds', 'success');
+                    showToast('Step 1: Speak for 20 seconds', 'success');
                 } else {
-                    showToast('🎯 Phase 2: Say the keyword below!', 'success');
+                    showToast('Step 2: Say the keyword below!', 'success');
                 }
             };
 
@@ -1777,6 +1825,17 @@
 
         function handleShake() {
             shakeCount++;
+
+            // Music system
+            lastShakeTime = Date.now();
+
+            if (shakeCount === 7) {
+                startMusic();
+            }
+
+            if (musicStarted) {
+                resumeMusic();
+            }
             document.getElementById('shakeCount').textContent = shakeCount;
             
             const progress = (shakeCount / CONFIG.requiredShakes) * 100;
